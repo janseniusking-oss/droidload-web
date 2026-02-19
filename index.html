@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DroidLoad • Téléchargeur Vidéo & Audio Gratuit</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    :root {
+      --bg: #0d0d1a;
+      --card: #141426;
+      --accent: #00f0ff;
+      --accent-glow: #00f0ff33;
+      --danger: #ff2d55;
+      --text: #e0f7ff;
+      --text-muted: #a0c0ff;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      background-image:
+        radial-gradient(circle at 15% 50%, #1a0033 0%, transparent 40%),
+        radial-gradient(circle at 85% 30%, #001a33 0%, transparent 50%);
+      overflow-x: hidden;
+    }
+    .container {
+      max-width: 680px;
+      margin: 4rem auto;
+      padding: 0 1.5rem;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+    .logo {
+      font-size: 3.8rem;
+      font-weight: 900;
+      letter-spacing: -2px;
+      background: linear-gradient(90deg, #00f0ff, #ff2d55, #00f0ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: glitch 4s infinite;
+    }
+    @keyframes glitch {
+      0%,100% { text-shadow: 0 0 10px var(--accent-glow); }
+      2% { text-shadow: 2px 0 #ff2d55, -2px 0 #00f0ff; }
+      4% { text-shadow: -2px 0 #ff2d55, 2px 0 #00f0ff; }
+    }
+    .subtitle {
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      font-size: 1.1rem;
+    }
+    .input-group {
+      position: relative;
+      margin: 2.5rem 0;
+    }
+    input[type="url"] {
+      width: 100%;
+      padding: 1.4rem 1.8rem 1.4rem 5.5rem;
+      background: var(--card);
+      border: 2px solid transparent;
+      border-radius: 16px;
+      font-size: 1.1rem;
+      color: white;
+      transition: all 0.3s;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    input[type="url"]:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 6px var(--accent-glow);
+    }
+    .input-icon {
+      position: absolute;
+      left: 1.8rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--accent);
+      font-size: 1.5rem;
+    }
+    .btn {
+      width: 100%;
+      padding: 1.3rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.4s;
+      position: relative;
+      overflow: hidden;
+      margin: 1rem 0;
+    }
+    .btn-primary {
+      background: linear-gradient(90deg, #00d4ff, #0095ff);
+      color: black;
+      box-shadow: 0 10px 30px rgba(0, 240, 255, 0.3);
+    }
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 15px 40px rgba(0, 240, 255, 0.5);
+    }
+    .btn-primary::before {
+      content: "";
+      position: absolute;
+      top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      transition: 0.7s;
+    }
+    .btn-primary:hover::before { left: 100%; }
+    #loading {
+      display: none;
+      text-align: center;
+      margin: 3rem 0;
+    }
+    .spinner {
+      width: 80px;
+      height: 80px;
+      border: 6px solid #1a1a3a;
+      border-top: 6px solid var(--accent);
+      border-radius: 50%;
+      animation: spin 1.1s linear infinite;
+      margin: 0 auto 1.5rem;
+      box-shadow: 0 0 25px var(--accent-glow);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-text {
+      font-size: 1.4rem;
+      color: var(--accent);
+      text-shadow: 0 0 15px var(--accent-glow);
+    }
+    #result {
+      display: none;
+      margin-top: 2rem;
+    }
+    .format-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1.2rem;
+      margin-top: 1.5rem;
+    }
+    .format-card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 1.5rem;
+      text-align: center;
+      transition: all 0.3s;
+      border: 1px solid #222244;
+      cursor: pointer;
+    }
+    .format-card:hover {
+      transform: translateY(-8px);
+      border-color: var(--accent);
+      box-shadow: 0 15px 35px rgba(0,240,255,0.2);
+    }
+    .format-card i {
+      font-size: 2.2rem;
+      color: var(--accent);
+      margin-bottom: 0.8rem;
+    }
+    .format-size {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+    .download-link {
+      display: inline-block;
+      padding: 12px 24px;
+      margin: 8px;
+      background: var(--accent);
+      color: black;
+      text-decoration: none;
+      border-radius: 50px;
+      font-weight: bold;
+      transition: 0.3s;
+    }
+    .download-link:hover {
+      background: #00d4ff;
+      transform: translateY(-3px);
+    }
+    #error {
+      color: var(--danger);
+      margin-top: 2rem;
+      font-size: 1.2rem;
+      display: none;
+    }
+    footer {
+      text-align: center;
+      padding: 3rem 0;
+      color: #444466;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">DROID<span style="color:#ff2d55">LOAD</span></div>
+      <div class="subtitle">Télécharge n'importe quelle vidéo ou audio • Rapide • Léger • Efficace</div>
+    </header>
+
+    <div class="input-group">
+      <i class="fas fa-link input-icon"></i>
+      <input type="url" id="urlInput" placeholder="YouTube, TikTok, Instagram, Facebook, Vimeo..." required>
+    </div>
+
+    <button class="btn btn-primary" id="analyzeBtn">ANALYSER & TÉLÉCHARGER</button>
+
+    <div id="loading">
+      <div class="spinner"></div>
+      <div class="progress-text">Analyse en cours...</div>
+    </div>
+
+    <div id="result">
+      <img id="thumbnail" src="" alt="Miniature de la vidéo" style="display:none;max-width:100%;border-radius:16px;margin-bottom:2rem;box-shadow:0 10px 30px rgba(0,240,255,0.2);">
+
+      <h2 class="section-title">Liens de Téléchargement</h2>
+      <div id="links" class="format-grid"></div>
+    </div>
+
+    <div id="error"></div>
+  </div>
+
+  <footer>
+    © 2026 • DroidLoad • Pour usage personnel • Respecte les droits d'auteur
+  </footer>
+
+  <script>
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const urlInput = document.getElementById('urlInput');
+    const loading = document.getElementById('loading');
+    const result = document.getElementById('result');
+    const thumbnail = document.getElementById('thumbnail');
+    const linksDiv = document.getElementById('links');
+    const errorDiv = document.getElementById('error');
+
+    analyzeBtn.addEventListener('click', async () => {
+      const url = urlInput.value.trim();
+      if (!url) {
+        errorDiv.textContent = "Colle un lien valide s'il te plaît !";
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      errorDiv.style.display = 'none';
+      analyzeBtn.disabled = true;
+      loading.style.display = 'block';
+      result.style.display = 'none';
+
+      try {
+        // API 1 : ssyoutube.com (très fiable en 2026 pour YouTube/TikTok/Insta)
+        let apiUrl = `https://ssyoutube.com/api/convert?url=${encodeURIComponent(url)}`;
+        let response = await fetch(apiUrl, { mode: 'cors' });
+        let data = await response.json();
+
+        if (!data.links || data.links.length === 0) {
+          // Fallback API 2 : yt5s.io (encore active)
+          apiUrl = `https://yt5s.io/api/ajaxSearch?ajaxSearch=1&q=${encodeURIComponent(url)}`;
+          response = await fetch(apiUrl);
+          data = await response.json();
+        }
+
+        if (!data.links || data.links.length === 0) {
+          throw new Error("Aucun lien de téléchargement trouvé (Essaie un autre lien)");
+        }
+
+        // Miniature (priorité YouTube, fallback générique)
+        thumbnail.src = data.thumbnail || `https://img.youtube.com/vi/${url.match(/v=([^&]+)/)?.[1] || 'dQw4w9WgXcQ'}/hqdefault.jpg`;
+        thumbnail.style.display = 'block';
+        thumbnail.onerror = () => {
+          thumbnail.src = 'https://via.placeholder.com/640x360/141426/00f0ff?text=Pas+de+miniature';
+        };
+
+        linksDiv.innerHTML = '';
+
+        data.links.forEach(link => {
+          const card = document.createElement('div');
+          card.className = 'format-card';
+          card.innerHTML = `
+            <i class="fas fa-download"></i>
+            <div style="font-weight:bold">${link.quality || link.type || 'Télécharger'}</div>
+            <div class="format-size">${link.ext || 'MP4'} • ${link.size || '?'}</div>
+          `;
+          card.onclick = () => window.open(link.url, '_blank');
+          linksDiv.appendChild(card);
+        });
+
+        result.style.display = 'block';
+      } catch (err) {
+        errorDiv.textContent = "Erreur : " + err.message;
+        errorDiv.style.display = 'block';
+      } finally {
+        loading.style.display = 'none';
+        analyzeBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
