@@ -105,36 +105,21 @@
       transform: translateY(-3px);
       box-shadow: 0 15px 40px rgba(0, 240, 255, 0.5);
     }
-    .btn-primary::before {
-      content: "";
-      position: absolute;
-      top: 0; left: -100%;
-      width: 100%; height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-      transition: 0.7s;
-    }
-    .btn-primary:hover::before { left: 100%; }
     #loading {
       display: none;
       text-align: center;
       margin: 3rem 0;
     }
     .spinner {
-      width: 80px;
-      height: 80px;
-      border: 6px solid #1a1a3a;
-      border-top: 6px solid var(--accent);
+      width: 60px;
+      height: 60px;
+      border: 5px solid #1a1a3a;
+      border-top: 5px solid var(--accent);
       border-radius: 50%;
-      animation: spin 1.1s linear infinite;
-      margin: 0 auto 1.5rem;
-      box-shadow: 0 0 25px var(--accent-glow);
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .progress-text {
-      font-size: 1.4rem;
-      color: var(--accent);
-      text-shadow: 0 0 15px var(--accent-glow);
-    }
     #result {
       display: none;
       margin-top: 2rem;
@@ -152,49 +137,29 @@
       text-align: center;
       transition: all 0.3s;
       border: 1px solid #222244;
-      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
     }
     .format-card:hover {
-      transform: translateY(-8px);
+      transform: translateY(-5px);
       border-color: var(--accent);
-      box-shadow: 0 15px 35px rgba(0,240,255,0.2);
     }
     .format-card i {
-      font-size: 2.2rem;
+      font-size: 2rem;
       color: var(--accent);
-      margin-bottom: 0.8rem;
-    }
-    .format-size {
-      font-size: 0.9rem;
-      color: var(--text-muted);
-      margin-top: 0.5rem;
-    }
-    .download-link {
-      display: inline-block;
-      padding: 12px 24px;
-      margin: 8px;
-      background: var(--accent);
-      color: black;
-      text-decoration: none;
-      border-radius: 50px;
-      font-weight: bold;
-      transition: 0.3s;
-    }
-    .download-link:hover {
-      background: #00d4ff;
-      transform: translateY(-3px);
+      margin-bottom: 0.5rem;
     }
     #error {
       color: var(--danger);
       margin-top: 2rem;
-      font-size: 1.2rem;
+      text-align: center;
       display: none;
     }
     footer {
       text-align: center;
       padding: 3rem 0;
       color: #444466;
-      font-size: 0.9rem;
+      font-size: 0.8rem;
     }
   </style>
 </head>
@@ -202,25 +167,23 @@
   <div class="container">
     <header>
       <div class="logo">DROID<span style="color:#ff2d55">LOAD</span></div>
-      <div class="subtitle">Télécharge n'importe quelle vidéo ou audio • Rapide • Léger • Efficace</div>
+      <div class="subtitle">Télécharge n'importe quelle vidéo • Rapide • Gratuit</div>
     </header>
 
     <div class="input-group">
       <i class="fas fa-link input-icon"></i>
-      <input type="url" id="urlInput" placeholder="YouTube, TikTok, Instagram, Facebook, Vimeo..." required>
+      <input type="url" id="urlInput" placeholder="Colle le lien TikTok, YouTube ou Insta ici..." required>
     </div>
 
     <button class="btn btn-primary" id="analyzeBtn">ANALYSER & TÉLÉCHARGER</button>
 
     <div id="loading">
       <div class="spinner"></div>
-      <div class="progress-text">Analyse en cours...</div>
+      <div class="progress-text">Recherche de la vidéo...</div>
     </div>
 
     <div id="result">
-      <img id="thumbnail" src="" alt="Miniature de la vidéo" style="display:none;max-width:100%;border-radius:16px;margin-bottom:2rem;box-shadow:0 10px 30px rgba(0,240,255,0.2);">
-
-      <h2 class="section-title">Liens de Téléchargement</h2>
+      <h2 style="margin-bottom: 1rem;">C'est prêt ! ✨</h2>
       <div id="links" class="format-grid"></div>
     </div>
 
@@ -228,7 +191,7 @@
   </div>
 
   <footer>
-    © 2026 • DroidLoad • Pour usage personnel • Respecte les droits d'auteur
+    © 2026 • DroidLoad • Usage personnel uniquement 
   </footer>
 
   <script>
@@ -236,67 +199,69 @@
     const urlInput = document.getElementById('urlInput');
     const loading = document.getElementById('loading');
     const result = document.getElementById('result');
-    const thumbnail = document.getElementById('thumbnail');
     const linksDiv = document.getElementById('links');
     const errorDiv = document.getElementById('error');
 
     analyzeBtn.addEventListener('click', async () => {
-      const url = urlInput.value.trim();
-      if (!url) {
-        errorDiv.textContent = "Colle un lien valide s'il te plaît !";
-        errorDiv.style.display = 'block';
-        return;
-      }
+      const videoUrl = urlInput.value.trim();
+      if (!videoUrl) return;
 
+      // Reset UI
       errorDiv.style.display = 'none';
-      analyzeBtn.disabled = true;
-      loading.style.display = 'block';
       result.style.display = 'none';
+      loading.style.display = 'block';
+      analyzeBtn.disabled = true;
 
       try {
-        // API 1 : ssyoutube.com (très fiable en 2026 pour YouTube/TikTok/Insta)
-        let apiUrl = `https://ssyoutube.com/api/convert?url=${encodeURIComponent(url)}`;
-        let response = await fetch(apiUrl, { mode: 'cors' });
-        let data = await response.json();
-
-        if (!data.links || data.links.length === 0) {
-          // Fallback API 2 : yt5s.io (encore active)
-          apiUrl = `https://yt5s.io/api/ajaxSearch?ajaxSearch=1&q=${encodeURIComponent(url)}`;
-          response = await fetch(apiUrl);
-          data = await response.json();
-        }
-
-        if (!data.links || data.links.length === 0) {
-          throw new Error("Aucun lien de téléchargement trouvé (Essaie un autre lien)");
-        }
-
-        // Miniature (priorité YouTube, fallback générique)
-        thumbnail.src = data.thumbnail || `https://img.youtube.com/vi/${url.match(/v=([^&]+)/)?.[1] || 'dQw4w9WgXcQ'}/hqdefault.jpg`;
-        thumbnail.style.display = 'block';
-        thumbnail.onerror = () => {
-          thumbnail.src = 'https://via.placeholder.com/640x360/141426/00f0ff?text=Pas+de+miniature';
-        };
-
-        linksDiv.innerHTML = '';
-
-        data.links.forEach(link => {
-          const card = document.createElement('div');
-          card.className = 'format-card';
-          card.innerHTML = `
-            <i class="fas fa-download"></i>
-            <div style="font-weight:bold">${link.quality || link.type || 'Télécharger'}</div>
-            <div class="format-size">${link.ext || 'MP4'} • ${link.size || '?'}</div>
-          `;
-          card.onclick = () => window.open(link.url, '_blank');
-          linksDiv.appendChild(card);
+        // Utilisation de l'API Cobalt (très puissante en 2026)
+        // Note: On utilise un serveur public. Si ça sature, il faudra sa propre instance.
+        const response = await fetch("https://api.cobalt.tools/api/json", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({
+            url: videoUrl,
+            vQuality: "720",
+            filenamePattern: "basic"
+          })
         });
 
+        const data = await response.json();
+
+        if (data.status === "error") {
+          throw new Error("Lien non supporté ou protégé.");
+        }
+
+        // Affichage du résultat
+        linksDiv.innerHTML = `
+          <a href="${data.url}" target="_blank" class="format-card">
+            <i class="fas fa-file-video"></i>
+            <div style="font-weight:bold">Télécharger la Vidéo</div>
+            <div style="font-size:0.8rem; opacity:0.7">Qualité HD • MP4</div>
+          </a>
+        `;
+
+        // Si c'est de la musique (YouTube/TikTok), on peut proposer l'audio
+        if (data.picker) {
+           // Si plusieurs formats sont dispos
+           linksDiv.innerHTML = data.picker.map(item => `
+              <a href="${item.url}" target="_blank" class="format-card">
+                <i class="fas fa-download"></i>
+                <div style="font-weight:bold">${item.type || 'Fichier'}</div>
+              </a>
+           `).join('');
+        }
+
+        loading.style.display = 'none';
         result.style.display = 'block';
+
       } catch (err) {
-        errorDiv.textContent = "Erreur : " + err.message;
+        loading.style.display = 'none';
+        errorDiv.textContent = "Désolé, impossible de récupérer cette vidéo. Vérifie le lien ! ❌";
         errorDiv.style.display = 'block';
       } finally {
-        loading.style.display = 'none';
         analyzeBtn.disabled = false;
       }
     });
