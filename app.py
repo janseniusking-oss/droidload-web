@@ -7,14 +7,24 @@ app = Flask(__name__)
 def index():
     return render_template('index.html')
 
-@app.route('/download', methods=['POST'])
+@app.route('/api/download', methods=['POST'])
 def download():
-    video_url = request.json.get('url')
-    # Ici on appelle l'API Cobalt depuis le serveur (pas de blocage CORS)
-    response = requests.post("https://api.cobalt.tools/api/json", 
-                             json={"url": video_url},
-                             headers={"Accept": "application/json"})
-    return jsonify(response.json())
+    user_url = request.json.get('url')
+    try:
+        # On utilise l'API Cobalt spécialisée dans TikTok
+        payload = {
+            "url": user_url,
+            "vQuality": "720",
+            "isNoWatermark": True  # Option magique pour TikTok sans logo !
+        }
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        r = requests.post("https://api.cobalt.tools/api/json", json=payload, headers=headers)
+        return jsonify(r.json())
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True)
