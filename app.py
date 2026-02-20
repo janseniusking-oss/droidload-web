@@ -1,66 +1,76 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file
 import requests
 import re
 import io
-from urllib.parse import urlparse
+from urllib.parse import unquote
 
 app = Flask(__name__)
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-    "Accept": "application/json, text/plain, */*",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
     "Referer": "https://www.tiktok.com/",
+    "Origin": "https://www.tiktok.com",
 }
 
-def extract_tiktok_video_url(shared_url: str) -> str | None:
-    """Récupère l'URL vidéo propre depuis un lien TikTok (mobile ou web)"""
+def get_clean_tiktok_url(shared_url: str) -> str | None:
     try:
-        # Suivre les redirections (très important pour les liens courts t.co / vm.tiktok)
-        r = requests.get(shared_url, headers=HEADERS, allow_redirects=True, timeout=12)
-        final_url = r.url
-
-        # Cas lien mobile → on cherche la vidéo ID
-        if "tiktok.com/@username/video/" in final_url:
+        with requests.Session() as session:
+            session.headers.update(HEADERS)
+            resp = session.get(shared_url, allow_redirects=True, timeout=12)
+            final_url = resp.url
+            
+            if "/video/" in final_url or "/t/" in final_url:
+                return final_url
+                
+            # Si redirection vers page d'erreur TikTok
+            if "unavailable" in final_url.lower() or "private" in final_url.lower():
+                return None
+                
             return final_url
-
-        # Sinon on essaie de parser le HTML pour trouver le json ld+json ou le video id
-        html = r.text
-        match = re.search(r'"downloadAddr":"(https?://[^"]+)"', html) or \
-                re.search(r'"playAddr":"(https?://[^"]+)"', html) or \
-                re.search(r'/video/(\d+)', final_url)
-
-        if match:
-            if match.group(0).startswith("http"):
-                return match.group(1)
-            else:
-                video_id = match.group(1)
-                return f"https://www.tiktok.com/@user/video/{video_id}"
-
-        return None
     except Exception:
         return None
 
 
-def get_tiktok_no_watermark_url(video_page_url: str) -> tuple | None:
-    """
-    Méthode 1 : plusieurs services publics (souvent bloqués ou limités)
-    Retourne (url_sans_watermark, type("video"/"image"), filename)
-    """
+def extract_no_watermark_link(page_url: str) -> dict:
     services = [
-        # snaptik méthode (souvent marche encore en 2025-2026)
+        # SnapTik (souvent mis à jour)
         {
             "url": "https://snaptik.app/abc.php",
             "method": "POST",
-            "data": {"url": video_page_url},
-            "regex": r'href="(https?://[^"]+)"[^>]*download-without-watermark'
+            "data": {"url": page_url},
+            "regex": r'(https?://[^"\']+\.mp4[^"\']*?)(?:"|\')(?=.*without.*watermark|.*no.*logo)'
         },
-        # ssstik méthode
+        # SnapTik alternative domain
+        {
+            "url": "https://snaptik.gd/abc.php",
+            "method": "POST",
+            "data": {"url": page_url},
+            "regex": r'(https?://[^"\']+\.mp4[^"\']*?)(?:"|\')(?=.*without.*watermark|.*no.*logo)'
+        },
+        # SSSTik
         {
             "url": "https://ssstik.io/abc?url=dl",
             "method": "POST",
-            "data": {"id": video_page_url, "locale": "en", "tt": "0"},
-            "regex": r'href="(https?[^"]+)"[^>]*without watermark'
+            "data": {"id": page_url, "locale": "en", "tt": "0"},
+            "regex": r'href="(https?://[^"]+)"[^>]*?without watermark|no watermark|download'
         },
+        # DLTTK / MusicallyDown style (2025-2026)
+        {
+            "url": "https://dl.tikdown.org/api/ajaxSearch",
+            "method": "POST",
+            "data": {"q": page_url},
+            "regex": r'href="(https?://[^"]+\.mp4[^"]*)"[^>]*?download'
+        },
+        # Fallback : essayer de trouver playAddr directement dans le HTML TikTok
+        {
+            "url": page_url,
+            "method": "GET",
+            "data": {},
+            "regex": r'"playAddr":\s*["\']?(https?://[^"\']+)["\']?|'
+                     r'"downloadAddr":\s*["\']?(https?://[^"\']+)["\']?'
+        }
     ]
 
     for svc in services:
@@ -68,72 +78,107 @@ def get_tiktok_no_watermark_url(video_page_url: str) -> tuple | None:
             if svc["method"] == "POST":
                 r = requests.post(svc["url"], data=svc["data"], headers=HEADERS, timeout=15)
             else:
-                r = requests.get(svc["url"] + "?url=" + video_page_url, headers=HEADERS, timeout=15)
+                r = requests.get(svc["url"], headers=HEADERS, timeout=15)
 
-            if r.status_code != 200:
+            if r.status_code not in (200, 201, 202):
                 continue
 
-            match = re.search(svc["regex"], r.text, re.IGNORECASE | re.DOTALL)
-            if match:
-                dl_url = match.group(1)
-                # Déterminer type
-                content_type = requests.head(dl_url, headers=HEADERS, timeout=8).headers.get("content-type", "")
-                ext = "mp4" if "video" in content_type else "jpg" if "image" in content_type else "mp4"
-                filename = f"tiktok_{video_page_url.split('/')[-1]}.{ext}"
-                return dl_url, ext, filename
+            matches = re.findall(svc["regex"], r.text, re.IGNORECASE | re.DOTALL)
+            for match in matches:
+                if isinstance(match, tuple):
+                    url_candidate = next((m for m in match if m), None)
+                else:
+                    url_candidate = match
+
+                if url_candidate and "mp4" in url_candidate.lower():
+                    clean_url = unquote(url_candidate.strip('"\''))
+                    # Vérification minimale
+                    try:
+                        head = requests.head(clean_url, headers=HEADERS, timeout=8, allow_redirects=True)
+                        if head.status_code in (200, 206) and "video" in head.headers.get("content-type", ""):
+                            filename = f"tiktok_{page_url.split('/')[-1]}.mp4"
+                            return {
+                                "success": True,
+                                "url": clean_url,
+                                "filename": filename
+                            }
+                    except:
+                        pass  # on continue si head échoue
 
         except Exception:
             continue
 
-    return None, None, None
+    return {
+        "success": False,
+        "message": "Impossible de trouver un lien sans filigrane. Vidéo privée, supprimée, ou restrictions régionales ?"
+    }
 
 
-@app.route("/", methods=["GET", "POST"])
+@app.route("/")
 def index():
-    if request.method == "POST":
-        tiktok_url = request.form.get("url", "").strip()
-
-        if not tiktok_url:
-            return render_template("index.html", error="Entre un lien TikTok stp")
-
-        clean_url = extract_tiktok_video_url(tiktok_url)
-        if not clean_url:
-            return render_template("index.html", error="Lien TikTok invalide ou non reconnu")
-
-        no_wm_url, media_type, filename = get_tiktok_no_watermark_url(clean_url)
-
-        if not no_wm_url:
-            return render_template("index.html", error="Impossible de trouver la version sans logo 😕 (TikTok a peut-être bloqué)")
-
-        # On redirige directement vers le téléchargement
-        return redirect(no_wm_url)
-
-        # Alternative : montrer la page avec bouton de téléchargement
-        # return render_template("index.html", success=True, download_url=no_wm_url, filename=filename, media_type=media_type)
-
     return render_template("index.html")
 
 
-@app.route("/download")
-def download():
-    url = request.args.get("url")
-    filename = request.args.get("filename", "tiktok_video.mp4")
+@app.route("/api/download", methods=["POST"])
+def api_download():
+    try:
+        data = request.get_json(silent=True) or {}
+        tiktok_url = (data.get("url") or "").strip()
 
+        if not tiktok_url:
+            return jsonify({
+                "status": "error",
+                "message": "Veuillez fournir un lien TikTok"
+            }), 400
+
+        clean_url = get_clean_tiktok_url(tiktok_url)
+        if not clean_url:
+            return jsonify({
+                "status": "error",
+                "message": "Lien TikTok invalide ou redirection échouée"
+            }), 400
+
+        result = extract_no_watermark_link(clean_url)
+
+        if not result.get("success"):
+            return jsonify({
+                "status": "error",
+                "message": result.get("message", "Échec de l'extraction du lien sans filigrane")
+            }), 400
+
+        return jsonify({
+            "status": "success",
+            "url": result["url"],
+            "filename": result.get("filename", "video_tiktok.mp4")
+        })
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Erreur serveur : {str(e)}"
+        }), 500
+
+
+@app.route("/proxy-dl")
+def proxy_download():
+    url = request.args.get("url")
     if not url:
-        return "Pas d'URL", 400
+        return "Paramètre url manquant", 400
 
     try:
-        r = requests.get(url, headers=HEADERS, stream=True, timeout=20)
+        r = requests.get(url, headers=HEADERS, stream=True, timeout=30)
         r.raise_for_status()
+
+        filename = request.args.get("filename", "tiktok_video.mp4")
 
         return send_file(
             io.BytesIO(r.content),
             as_attachment=True,
             download_name=filename,
-            mimetype=r.headers.get("content-type", "video/mp4")
+            mimetype="video/mp4"
         )
     except Exception as e:
-        return f"Erreur pendant le téléchargement : {str(e)}", 500
+        return f"Impossible de télécharger la vidéo : {str(e)}", 500
 
 
 if __name__ == "__main__":
